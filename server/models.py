@@ -4,6 +4,7 @@ from sqlalchemy.orm import validates
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy_serializer import SerializerMixin
 
+
 metadata = MetaData(
     naming_convention={
         "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
@@ -20,9 +21,14 @@ class Restaurant(db.Model, SerializerMixin):
     name = db.Column(db.String)
     address = db.Column(db.String)
 
-    # add relationship
+    # relationship with RestaurantPizza
+    restaurant_pizzas = db.relationship('RestaurantPizza', back_populates='restaurant')
 
-    # add serialization rules
+    # relationship with Pizza through RestaurantPizza
+    pizzas = db.relationship('Pizza', secondary='restaurant_pizzas', back_populates='restaurants')
+
+    # serialization rules
+    serialize_rules = ('-restaurant_pizzas.restaurant',)
 
     def __repr__(self):
         return f"<Restaurant {self.name}>"
@@ -35,9 +41,14 @@ class Pizza(db.Model, SerializerMixin):
     name = db.Column(db.String)
     ingredients = db.Column(db.String)
 
-    # add relationship
+    # relationship with RestaurantPizza
+    restaurant_pizzas = db.relationship('RestaurantPizza', back_populates='pizza')
 
-    # add serialization rules
+    # relationship with Restaurant through RestaurantPizza
+    restaurants = db.relationship('Restaurant', secondary='restaurant_pizzas', back_populates='pizzas')
+
+    # serialization rules
+    serialize_rules = ('-restaurant_pizzas.pizza',)
 
     def __repr__(self):
         return f"<Pizza {self.name}, {self.ingredients}>"
@@ -49,11 +60,22 @@ class RestaurantPizza(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     price = db.Column(db.Integer, nullable=False)
 
-    # add relationships
+    # relationships
+    restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurants.id'))
+    pizza_id = db.Column(db.Integer, db.ForeignKey('pizzas.id'))
+    restaurant = db.relationship('Restaurant', back_populates='restaurant_pizzas')
+    pizza = db.relationship('Pizza', back_populates='restaurant_pizzas')
 
-    # add serialization rules
+    # serialization rules
+    serialize_rules = ('-restaurant.restaurant_pizzas', '-pizza.restaurant_pizzas')
 
-    # add validation
+    # validation
+    @validates('price')
+    def validate_price(self, key, price):
+        if not (1 <= price <= 30):
+            raise ValueError('Price must be between 1 and 30')
+        return price
 
     def __repr__(self):
         return f"<RestaurantPizza ${self.price}>"
+    
